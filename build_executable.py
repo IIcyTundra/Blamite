@@ -34,7 +34,7 @@ def main():
             print(f"✓ Removed {folder} folder")
     
     # Install required packages
-    packages = ["pyinstaller", "watchdog"]
+    packages = ["pyinstaller", "watchdog", "pywin32"]
     for package in packages:
         if not run_command(f"pip install {package}", f"Installing {package}"):
             print(f"Failed to install {package}. Please install manually.")
@@ -45,7 +45,7 @@ def main():
         "pyinstaller",
         "--onefile",           # Single executable file
         "--console",           # Keep console window
-        "--icon=blamite_icon.ico",  # Use our custom icon
+        "--icon=BLAMITE_Logo.ico",  # Use our custom icon
         "--name=BLAMITE_Organizer", # Executable name
         "main.py"              # Source file
     ]
