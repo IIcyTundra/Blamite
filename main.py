@@ -21,9 +21,142 @@ SUBFOLDERS = {
     "gif": ORGANIZER / "Images",
     "png": ORGANIZER / "Images",
     "jpg": ORGANIZER / "Images",
-    "jpeg": ORGANIZER / "Images"
+    "jpeg": ORGANIZER / "Images",
+    "txt": ORGANIZER / "Text_Files"
 }
 DOWNLOADS = Path.home() / "Downloads"
+
+# Settings file for user preferences
+SETTINGS_FILE = Path(__file__).parent / "blamite_settings.txt"
+
+def load_settings():
+    """Load user settings from file"""
+    default_settings = {
+        'backtrack_enabled': True,
+        'backtrack_days': 30,
+        'backtrack_all_files': False  # If True, ignore date filtering
+    }
+    
+    if not SETTINGS_FILE.exists():
+        save_settings(default_settings)
+        return default_settings
+    
+    try:
+        settings = {}
+        with open(SETTINGS_FILE, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if '=' in line and not line.startswith('#'):
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip().lower()
+                    
+                    if value in ['true', 'false']:
+                        settings[key] = value == 'true'
+                    elif value.isdigit():
+                        settings[key] = int(value)
+                    else:
+                        settings[key] = value
+        
+        # Ensure all required settings exist
+        for key, default_value in default_settings.items():
+            if key not in settings:
+                settings[key] = default_value
+        
+        return settings
+    except Exception as e:
+        print(f"⚠️  Error loading settings: {e}. Using defaults.")
+        return default_settings
+
+def save_settings(settings):
+    """Save user settings to file"""
+    try:
+        with open(SETTINGS_FILE, 'w') as f:
+            f.write("# BLAMITE Organizer Settings\n")
+            f.write("# Edit these values to customize your experience\n\n")
+            f.write("# Enable/disable backtracking on startup (true/false)\n")
+            f.write(f"backtrack_enabled={str(settings['backtrack_enabled']).lower()}\n\n")
+            f.write("# Number of days to look back for files (when backtrack_all_files=false)\n")
+            f.write(f"backtrack_days={settings['backtrack_days']}\n\n")
+            f.write("# Organize ALL files regardless of date (true/false)\n")
+            f.write("# WARNING: Setting this to true will organize ALL files in Downloads!\n")
+            f.write(f"backtrack_all_files={str(settings['backtrack_all_files']).lower()}\n")
+    except Exception as e:
+        print(f"⚠️  Error saving settings: {e}")
+
+def show_settings_menu():
+    """Display and handle settings configuration"""
+    settings = load_settings()
+    
+    while True:
+        print("\n" + "="*50)
+        print("⚙️  BLAMITE ORGANIZER SETTINGS")
+        print("="*50)
+        print(f"1. Backtrack on startup: {'✅ Enabled' if settings['backtrack_enabled'] else '❌ Disabled'}")
+        
+        if settings['backtrack_enabled']:
+            if settings['backtrack_all_files']:
+                print("2. Backtrack mode: 🗂️  ALL FILES (ignores date)")
+            else:
+                print(f"2. Backtrack mode: 📅 Last {settings['backtrack_days']} days")
+        else:
+            print("2. Backtrack mode: ❌ Disabled")
+        
+        print("\n3. Toggle backtrack on/off")
+        print("4. Change backtrack days")
+        print("5. Toggle ALL files mode")
+        print("6. Reset to defaults")
+        print("7. Return to main program")
+        print("="*50)
+        
+        choice = input("\nEnter your choice (1-7): ").strip()
+        
+        if choice == '3':
+            settings['backtrack_enabled'] = not settings['backtrack_enabled']
+            status = "enabled" if settings['backtrack_enabled'] else "disabled"
+            print(f"✅ Backtracking {status}")
+            
+        elif choice == '4':
+            try:
+                days = int(input("Enter number of days to look back (1-365): "))
+                if 1 <= days <= 365:
+                    settings['backtrack_days'] = days
+                    settings['backtrack_all_files'] = False  # Reset all files mode
+                    print(f"✅ Backtrack period set to {days} days")
+                else:
+                    print("❌ Please enter a number between 1 and 365")
+            except ValueError:
+                print("❌ Please enter a valid number")
+                
+        elif choice == '5':
+            settings['backtrack_all_files'] = not settings['backtrack_all_files']
+            if settings['backtrack_all_files']:
+                confirm = input("⚠️  This will organize ALL files in Downloads! Continue? (y/n): ")
+                if confirm.lower() != 'y':
+                    settings['backtrack_all_files'] = False
+                    print("❌ All files mode cancelled")
+                else:
+                    print("✅ All files mode enabled")
+            else:
+                print("✅ All files mode disabled")
+                
+        elif choice == '6':
+            confirm = input("Reset all settings to defaults? (y/n): ")
+            if confirm.lower() == 'y':
+                settings = {
+                    'backtrack_enabled': True,
+                    'backtrack_days': 30,
+                    'backtrack_all_files': False
+                }
+                print("✅ Settings reset to defaults")
+                
+        elif choice == '7':
+            save_settings(settings)
+            print("✅ Settings saved!")
+            return settings
+            
+        else:
+            print("❌ Invalid choice. Please enter 1-7")
 
 # Create organizer folders if they don't exist
 def setup_folders():
@@ -55,7 +188,8 @@ def setup_folders():
     
     print("\n📋 Supported file types:")
     print("   📄 Documents: PDF, DOC, DOCX, XLS, XLSX")
-    print("   🖼️  Images: PNG, JPG, JPEG, GIF")
+    print("   � Text Files: TXT")
+    print("   �🖼️  Images: PNG, JPG, JPEG, GIF")
     print("   🎵 Audio: MP3")
     print("   🎬 Video: MP4, MOV")
     print("="*50)
@@ -64,15 +198,21 @@ def create_desktop_shortcuts():
     """No longer needed - function disabled"""
     pass
 
-def organize_existing_files(folder_path, days_back=30):
-    """Organize existing files from the last specified number of days"""
+def organize_existing_files(folder_path, settings):
+    """Organize existing files based on user settings"""
     folder = Path(folder_path)
     if not folder.exists():
         print(f"⚠️  Folder {folder} does not exist, skipping backtrack...")
         return
     
-    print(f"🔍 Scanning {folder.name} for files from the last {days_back} days...")
-    cutoff_date = datetime.now() - timedelta(days=days_back)
+    if settings['backtrack_all_files']:
+        print(f"🔍 Scanning {folder.name} for ALL files (ignoring date)...")
+        cutoff_date = None
+    else:
+        days_back = settings['backtrack_days']
+        print(f"🔍 Scanning {folder.name} for files from the last {days_back} days...")
+        cutoff_date = datetime.now() - timedelta(days=days_back)
+    
     organized_count = 0
     
     # Get all files in the folder (not directories)
@@ -95,16 +235,17 @@ def organize_existing_files(folder_path, days_back=30):
                 if ext not in SUBFOLDERS:
                     continue
                 
-                # Check if file is recent enough
-                file_modified = datetime.fromtimestamp(file_path.stat().st_mtime)
-                if file_modified < cutoff_date:
-                    continue
+                # Check if file is recent enough (skip if backtrack_all_files is True)
+                if cutoff_date is not None:
+                    file_modified = datetime.fromtimestamp(file_path.stat().st_mtime)
+                    if file_modified < cutoff_date:
+                        continue
                 
                 # Get file type description
                 file_type_desc = {
                     'pdf': 'PDF', 'doc': 'Word', 'docx': 'Word',
                     'xls': 'Excel', 'xlsx': 'Excel', 'mp3': 'Audio',
-                    'mp4': 'Video', 'mov': 'Video',
+                    'mp4': 'Video', 'mov': 'Video', 'txt': 'Text',
                     'png': 'Image', 'jpg': 'Image', 'jpeg': 'Image', 'gif': 'Image'
                 }.get(ext, ext.upper())
                 
@@ -140,10 +281,19 @@ def organize_existing_files(folder_path, days_back=30):
     except Exception as e:
         print(f"❗ Error scanning {folder}: {e}")
 
-def backtrack_and_organize():
-    """Organize existing files from Downloads from the last 30 days"""
+def backtrack_and_organize(settings):
+    """Organize existing files from Downloads based on user settings"""
+    if not settings['backtrack_enabled']:
+        print("\n" + "="*50)
+        print("⏭️  BACKTRACKING DISABLED (check settings to enable)")
+        print("="*50)
+        return
+    
     print("\n" + "="*50)
-    print("🔄 BACKTRACKING: Organizing files from Downloads (last 30 days)")
+    if settings['backtrack_all_files']:
+        print("🔄 BACKTRACKING: Organizing ALL files from Downloads")
+    else:
+        print(f"🔄 BACKTRACKING: Organizing files from Downloads (last {settings['backtrack_days']} days)")
     print("="*50)
     
     # Only check Downloads folder to avoid conflicts with Desktop organization
@@ -151,7 +301,7 @@ def backtrack_and_organize():
     
     for folder in folders_to_check:
         if folder.exists():
-            organize_existing_files(folder, days_back=30)
+            organize_existing_files(folder, settings)
         else:
             print(f"⚠️  {folder} does not exist, skipping...")
     
@@ -182,7 +332,7 @@ class FileHandler(FileSystemEventHandler):
                 'pdf': 'PDF Document',
                 'doc': 'Word Document', 'docx': 'Word Document',
                 'xls': 'Excel File', 'xlsx': 'Excel File',
-                'mp3': 'Audio File',
+                'mp3': 'Audio File', 'txt': 'Text File',
                 'mp4': 'Video File', 'mov': 'Video File',
                 'png': 'Image File', 'jpg': 'Image File', 'jpeg': 'Image File', 'gif': 'Image File'
             }.get(ext, f'{ext.upper()} File')
@@ -269,15 +419,31 @@ class FileHandler(FileSystemEventHandler):
             print(f"ℹ️  File type '{ext}' not supported, ignoring {file_path.name}")
 
 def main():
+    # Load user settings
+    settings = load_settings()
+    
+    # Show welcome message and settings option
+    print("\n" + "="*50)
+    print("⚙️  Press 'S' + Enter for Settings, or just Enter to continue...")
+    print("="*50)
+    
+    try:
+        user_input = input().strip().lower()
+        if user_input == 's':
+            settings = show_settings_menu()
+    except KeyboardInterrupt:
+        print("\n👋 Goodbye!")
+        return
+    
     # Start monitoring Downloads folder and organize to Desktop
     DESKTOP_FOLDER = Path.home() / "Desktop"
     main_folders = [DOWNLOADS, DESKTOP_FOLDER]
     
-    # Setup folders (create any missing ones) and backtrack on every startup
+    # Setup folders (create any missing ones) and backtrack based on settings
     setup_folders()
     
-    # Backtrack and organize existing files from the last 30 days
-    backtrack_and_organize()
+    # Backtrack and organize existing files based on user settings
+    backtrack_and_organize(settings)
     
     # Start monitoring for new files
     event_handler = FileHandler()

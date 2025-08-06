@@ -9,16 +9,19 @@ BLAMITE Organizer is a Python-based file organization tool that monitors your Do
 - **🔄 Real-time File Monitoring**: Automatically detects and organizes new downloads
 - **📂 Smart Organization**: Sorts files into categorized folders by type
 - **🗂️ Desktop Integration**: Creates organized folders directly on your Desktop for easy access
-- **⏰ Backtracking**: Organizes existing files from the last 30 days on startup
+- **⚙️ Customizable Settings**: Configure backtracking preferences and file organization behavior
+- **⏰ Flexible Backtracking**: Choose from 30-day backtracking, custom date ranges, or organize ALL files
 - **🔍 Duplicate Handling**: Automatically renames duplicate files to avoid conflicts
 - **📥 Download Detection**: Waits for files to finish downloading before organizing
 - **🚀 Executable Available**: Run as a standalone .exe file (no Python required)
+- **📝 Text File Support**: Now includes support for organizing .txt files
 
 ## 📋 Supported File Types
 
 | Category | File Types | Organized To |
 |----------|------------|--------------|
 | **Documents** | PDF, DOC, DOCX, XLS, XLSX | `Desktop/BLAMITE_Organizer/PDFs`, `Word_Documents`, `Excel_Files` |
+| **Text Files** | TXT | `Desktop/BLAMITE_Organizer/Text_Files` |
 | **Images** | PNG, JPG, JPEG, GIF | `Desktop/BLAMITE_Organizer/Images` |
 | **Audio** | MP3 | `Desktop/BLAMITE_Organizer/Audio_Files` |
 | **Video** | MP4, MOV | `Desktop/BLAMITE_Organizer/Video_Files` |
@@ -41,6 +44,7 @@ Desktop/
     ├── PDFs/
     ├── Word_Documents/
     ├── Excel_Files/
+    ├── Text_Files/
     ├── Images/
     ├── Audio_Files/
     └── Video_Files/
@@ -62,6 +66,67 @@ pip install watchdog
 
 # Run the organizer
 python main.py
+```
+
+## ⚙️ Settings & Configuration
+
+BLAMITE Organizer now includes a built-in settings menu to customize your file organization experience!
+
+### Accessing Settings
+
+When you start the program, you'll see:
+```
+==================================================
+⚙️  Press 'S' + Enter for Settings, or just Enter to continue...
+==================================================
+```
+
+Press **'S'** and **Enter** to access the settings menu.
+
+### Settings Options
+
+| Setting | Description | Options |
+|---------|-------------|---------|
+| **Backtrack on Startup** | Enable/disable organizing existing files when starting | ✅ Enabled / ❌ Disabled |
+| **Backtrack Mode** | Choose how to handle existing files | 📅 Last X days / 🗂️ ALL FILES |
+| **Backtrack Days** | Number of days to look back (when not using ALL FILES mode) | 1-365 days (default: 30) |
+
+### Settings Menu Navigation
+
+```
+⚙️  BLAMITE ORGANIZER SETTINGS
+==================================================
+1. Backtrack on startup: ✅ Enabled
+2. Backtrack mode: 📅 Last 30 days
+
+3. Toggle backtrack on/off
+4. Change backtrack days
+5. Toggle ALL files mode
+6. Reset to defaults
+7. Return to main program
+==================================================
+```
+
+### Important Notes
+
+- **ALL FILES Mode**: ⚠️ **Use with caution!** This will organize EVERY file in your Downloads folder, regardless of when it was created
+- **Settings File**: Your preferences are saved in `blamite_settings.txt` in the same folder as the program
+- **Manual Editing**: You can also edit the settings file directly with any text editor
+
+### Example Settings File
+```ini
+# BLAMITE Organizer Settings
+# Edit these values to customize your experience
+
+# Enable/disable backtracking on startup (true/false)
+backtrack_enabled=true
+
+# Number of days to look back for files (when backtrack_all_files=false)
+backtrack_days=30
+
+# Organize ALL files regardless of date (true/false)
+# WARNING: Setting this to true will organize ALL files in Downloads!
+backtrack_all_files=false
 ```
 
 ## 🛠️ How It Works

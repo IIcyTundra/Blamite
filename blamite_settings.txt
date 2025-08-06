@@ -1,0 +1,12 @@
+# BLAMITE Organizer Settings
+# Edit these values to customize your experience
+
+# Enable/disable backtracking on startup (true/false)
+backtrack_enabled=true
+
+# Number of days to look back for files (when backtrack_all_files=false)
+backtrack_days=365
+
+# Organize ALL files regardless of date (true/false)
+# WARNING: Setting this to true will organize ALL files in Downloads!
+backtrack_all_files=false
