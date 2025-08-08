@@ -1,5 +1,6 @@
 import os
 import shutil
+import sys
 import time
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -34,7 +35,8 @@ def load_settings():
     default_settings = {
         'backtrack_enabled': True,
         'backtrack_days': 30,
-        'backtrack_all_files': False  # If True, ignore date filtering
+        'backtrack_all_files': False,  # If True, ignore date filtering
+        'run_on_startup': False  # If True, add to Windows startup
     }
     
     if not SETTINGS_FILE.exists():
@@ -80,15 +82,83 @@ def save_settings(settings):
             f.write(f"backtrack_days={settings['backtrack_days']}\n\n")
             f.write("# Organize ALL files regardless of date (true/false)\n")
             f.write("# WARNING: Setting this to true will organize ALL files in Downloads!\n")
-            f.write(f"backtrack_all_files={str(settings['backtrack_all_files']).lower()}\n")
+            f.write(f"backtrack_all_files={str(settings['backtrack_all_files']).lower()}\n\n")
+            f.write("# Run BLAMITE Organizer on Windows startup (true/false)\n")
+            f.write(f"run_on_startup={str(settings['run_on_startup']).lower()}\n")
     except Exception as e:
         print(f"⚠️  Error saving settings: {e}")
+
+def manage_startup(enable, exe_path=None):
+    """Add or remove BLAMITE Organizer from Windows startup"""
+    import winreg
+    
+    key_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
+    app_name = "BLAMITE_Organizer"
+    
+    try:
+        # Open the registry key
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE)
+        
+        if enable:
+            # Determine the executable path
+            if exe_path is None:
+                # Try to find the executable in the same directory
+                current_dir = Path(__file__).parent
+                exe_path = current_dir / "BLAMITE_Organizer.exe"
+                
+                # If no exe found, use Python script
+                if not exe_path.exists():
+                    python_exe = Path(sys.executable)
+                    script_path = Path(__file__)
+                    exe_path = f'"{python_exe}" "{script_path}"'
+                else:
+                    exe_path = f'"{exe_path}"'
+            
+            # Add to startup
+            winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, str(exe_path))
+            winreg.CloseKey(key)
+            return True, "Added to Windows startup"
+            
+        else:
+            # Remove from startup
+            try:
+                winreg.DeleteValue(key, app_name)
+                winreg.CloseKey(key)
+                return True, "Removed from Windows startup"
+            except FileNotFoundError:
+                winreg.CloseKey(key)
+                return True, "Already not in startup"
+                
+    except Exception as e:
+        return False, f"Error managing startup: {e}"
+
+def check_startup_status():
+    """Check if BLAMITE Organizer is currently set to run on startup"""
+    import winreg
+    
+    key_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
+    app_name = "BLAMITE_Organizer"
+    
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_READ)
+        try:
+            winreg.QueryValueEx(key, app_name)
+            winreg.CloseKey(key)
+            return True
+        except FileNotFoundError:
+            winreg.CloseKey(key)
+            return False
+    except Exception:
+        return False
 
 def show_settings_menu():
     """Display and handle settings configuration"""
     settings = load_settings()
     
     while True:
+        # Check current startup status
+        startup_enabled = check_startup_status()
+        
         print("\n" + "="*50)
         print("⚙️  BLAMITE ORGANIZER SETTINGS")
         print("="*50)
@@ -102,21 +172,24 @@ def show_settings_menu():
         else:
             print("2. Backtrack mode: ❌ Disabled")
         
-        print("\n3. Toggle backtrack on/off")
-        print("4. Change backtrack days")
-        print("5. Toggle ALL files mode")
-        print("6. Reset to defaults")
-        print("7. Return to main program")
+        print(f"3. Run on Windows startup: {'✅ Enabled' if startup_enabled else '❌ Disabled'}")
+        
+        print("\n4. Toggle backtrack on/off")
+        print("5. Change backtrack days")
+        print("6. Toggle ALL files mode")
+        print("7. Toggle Windows startup")
+        print("8. Reset to defaults")
+        print("9. Return to main program")
         print("="*50)
         
-        choice = input("\nEnter your choice (1-7): ").strip()
+        choice = input("\nEnter your choice (1-9): ").strip()
         
-        if choice == '3':
+        if choice == '4':
             settings['backtrack_enabled'] = not settings['backtrack_enabled']
             status = "enabled" if settings['backtrack_enabled'] else "disabled"
             print(f"✅ Backtracking {status}")
             
-        elif choice == '4':
+        elif choice == '5':
             try:
                 days = int(input("Enter number of days to look back (1-365): "))
                 if 1 <= days <= 365:
@@ -128,7 +201,7 @@ def show_settings_menu():
             except ValueError:
                 print("❌ Please enter a valid number")
                 
-        elif choice == '5':
+        elif choice == '6':
             settings['backtrack_all_files'] = not settings['backtrack_all_files']
             if settings['backtrack_all_files']:
                 confirm = input("⚠️  This will organize ALL files in Downloads! Continue? (y/n): ")
@@ -140,23 +213,37 @@ def show_settings_menu():
             else:
                 print("✅ All files mode disabled")
                 
-        elif choice == '6':
+        elif choice == '7':
+            current_startup = check_startup_status()
+            success, message = manage_startup(not current_startup)
+            if success:
+                settings['run_on_startup'] = not current_startup
+                print(f"✅ {message}")
+            else:
+                print(f"❌ {message}")
+                
+        elif choice == '8':
             confirm = input("Reset all settings to defaults? (y/n): ")
             if confirm.lower() == 'y':
+                # Remove from startup if currently enabled
+                if check_startup_status():
+                    manage_startup(False)
+                
                 settings = {
                     'backtrack_enabled': True,
                     'backtrack_days': 30,
-                    'backtrack_all_files': False
+                    'backtrack_all_files': False,
+                    'run_on_startup': False
                 }
                 print("✅ Settings reset to defaults")
                 
-        elif choice == '7':
+        elif choice == '9':
             save_settings(settings)
             print("✅ Settings saved!")
             return settings
             
         else:
-            print("❌ Invalid choice. Please enter 1-7")
+            print("❌ Invalid choice. Please enter 1-9")
 
 # Create organizer folders if they don't exist
 def setup_folders():
@@ -188,8 +275,8 @@ def setup_folders():
     
     print("\n📋 Supported file types:")
     print("   📄 Documents: PDF, DOC, DOCX, XLS, XLSX")
-    print("   � Text Files: TXT")
-    print("   �🖼️  Images: PNG, JPG, JPEG, GIF")
+    print("   📝 Text Files: TXT")
+    print("   🖼️  Images: PNG, JPG, JPEG, GIF")
     print("   🎵 Audio: MP3")
     print("   🎬 Video: MP4, MOV")
     print("="*50)
@@ -487,7 +574,7 @@ if __name__ == "__main__":
         f"{project_title}\n"
         "----------------------------------------\n"
         "This project automatically organizes your downloaded files "
-        "(PDF, Word, Excel, Images, Audio, Video) "
+        "(PDF, Word, Excel, Images, Audio, Video, Text) "
         "into categorized folders directly on your Desktop for easy access.\n"
         "Thank you for using BLAMITE Organizer!\n"
     )
