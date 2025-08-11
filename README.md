@@ -23,6 +23,7 @@ BLAMITE Organizer is a Python-based file organization tool that monitors your Do
 - **📂 Smart Organization**: Sorts files into categorized folders by type
 - **🗂️ Desktop Integration**: Creates organized folders directly on your Desktop for easy access
 - **⚙️ Customizable Settings**: Configure backtracking preferences and file organization behavior
+- **🎛️ Runtime Settings Access**: Access settings menu while the program is running (type 'settings' + Enter)
 - **⏰ Flexible Backtracking**: Choose from 30-day backtracking, custom date ranges, or organize ALL files
 - **� Windows Startup Integration**: Optionally run BLAMITE on Windows startup for seamless operation
 - **🔄 Auto-Update System**: Automatic update checking and one-click updates from GitHub releases
@@ -167,6 +168,16 @@ backtrack_all_files=false
    - **Download Detection**: Monitors file size to ensure downloads are complete
    - **File Verification**: Confirms successful file moves
    - **Error Handling**: Gracefully handles locked or inaccessible files
+
+### Runtime Commands
+
+While BLAMITE Organizer is running and monitoring your files, you can use these commands:
+
+- **`settings`** or **`s`** - Opens the settings menu (temporarily stops monitoring)
+- **`help`** or **`h`** - Shows available commands  
+- **`Ctrl+C`** - Stops the program completely
+
+When you enter the settings menu, file monitoring is temporarily paused. After you finish with settings, monitoring automatically resumes.
 
 ## 🎯 Usage Examples
 

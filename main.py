@@ -1,6 +1,7 @@
 import os
 import shutil
 import sys
+import threading
 import time
 import json
 import subprocess
@@ -803,14 +804,67 @@ def main():
     print("🚀 BLAMITE Organizer is running...")
     print(f"📥 Watching Downloads folder, organizing to Desktop...")
     print(f"📁 Organized files location: {ORGANIZER}")
-    print("Press Ctrl+C to stop...")
+    print("💡 Type 'settings' + Enter to access Settings, or Ctrl+C to stop...")
+    
+    # Flag to control the input thread
+    running = True
+    settings_requested = False
+    
+    def input_handler():
+        """Handle user input in separate thread"""
+        nonlocal running, settings_requested
+        while running:
+            try:
+                user_input = input().strip().lower()
+                if user_input in ['s', 'settings', 'setting']:
+                    settings_requested = True
+                    print("\n⚙️  Settings request received... stopping monitor...")
+                elif user_input in ['help', 'h']:
+                    print("\nAvailable commands:")
+                    print("  'settings' or 's' - Open settings menu")
+                    print("  'help' or 'h' - Show this help")
+                    print("  Ctrl+C - Stop program")
+            except (EOFError, KeyboardInterrupt):
+                running = False
+                break
+    
+    # Start input handler thread
+    input_thread = threading.Thread(target=input_handler, daemon=True)
+    input_thread.start()
     
     try:
-        while True:
-            time.sleep(1)
+        while running:
+            # Check if user requested settings
+            if settings_requested:
+                settings_requested = False
+                
+                print("🛑 Temporarily stopping file monitoring...")
+                observer.stop()
+                observer.join()
+                
+                # Show settings menu
+                print("\n" + "="*50)
+                new_settings = show_settings_menu()
+                settings.update(new_settings)
+                
+                # Restart monitoring
+                print("🔄 Restarting file monitoring...")
+                event_handler = FileHandler()
+                observer = Observer()
+                if DOWNLOADS.exists():
+                    observer.schedule(event_handler, str(DOWNLOADS), recursive=False)
+                observer.start()
+                
+                print("\n🚀 BLAMITE Organizer resumed monitoring...")
+                print("💡 Type 'settings' + Enter to access Settings, or Ctrl+C to stop...")
+            
+            time.sleep(0.1)  # Small delay to prevent high CPU usage
+            
     except KeyboardInterrupt:
         print("\n🛑 Stopping BLAMITE Organizer...")
+        running = False
         observer.stop()
+    
     observer.join()
     print("✅ BLAMITE Organizer stopped.")
 

@@ -30,8 +30,15 @@ def main():
     print("\nCleaning previous builds...")
     for folder in ["dist", "build"]:
         if Path(folder).exists():
-            shutil.rmtree(folder)
-            print(f"✓ Removed {folder} folder")
+            try:
+                shutil.rmtree(folder)
+                print(f"✓ Removed {folder} folder")
+            except PermissionError:
+                print(f"⚠️  Warning: Cannot remove {folder} folder (files may be in use)")
+                print("Please close any running BLAMITE Organizer instances and try again.")
+                response = input("Continue anyway? (y/n): ").lower().strip()
+                if response != 'y':
+                    return False
     
     # Check if required files exist
     required_files = ["main.py", "BLAMITE_TITLE.txt", "VERSION"]
