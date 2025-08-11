@@ -2,10 +2,18 @@ import os
 import shutil
 import sys
 import time
+import json
+import subprocess
+import tempfile
 from pathlib import Path
 from datetime import datetime, timedelta
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+
+try:
+    import requests
+except ImportError:
+    requests = None
 
 # Define paths
 DESKTOP = Path.home() / "Desktop"
@@ -29,6 +37,240 @@ DOWNLOADS = Path.home() / "Downloads"
 
 # Settings file for user preferences
 SETTINGS_FILE = Path(__file__).parent / "blamite_settings.txt"
+
+def get_current_version():
+    """Get current version from version file or default"""
+    try:
+        if getattr(sys, 'frozen', False):
+            # Running as executable
+            version_file = Path(sys.executable).parent / "VERSION"
+        else:
+            # Running as script
+            version_file = Path(__file__).parent / "VERSION"
+        
+        if version_file.exists():
+            return version_file.read_text().strip()
+    except:
+        pass
+    return "1.0.0"
+
+def version_compare(v1, v2):
+    """Compare version strings (returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal)"""
+    try:
+        v1_parts = [int(x) for x in v1.split('.')]
+        v2_parts = [int(x) for x in v2.split('.')]
+        
+        for i in range(max(len(v1_parts), len(v2_parts))):
+            v1_part = v1_parts[i] if i < len(v1_parts) else 0
+            v2_part = v2_parts[i] if i < len(v2_parts) else 0
+            
+            if v1_part > v2_part:
+                return 1
+            elif v1_part < v2_part:
+                return -1
+        
+        return 0
+    except:
+        return 0
+
+def check_for_updates():
+    """Check GitHub releases for newer version"""
+    if not requests:
+        return {'update_available': False, 'error': 'Requests module not available'}
+    
+    try:
+        current_version = get_current_version()
+        # Update with your actual GitHub username and repo name
+        api_url = "https://api.github.com/repos/IIcyTundra/Blamite/releases/latest"
+        
+        response = requests.get(api_url, timeout=10)
+        
+        if response.status_code == 200:
+            latest_release = response.json()
+            latest_version = latest_release['tag_name'].lstrip('v')
+            
+            if version_compare(latest_version, current_version) > 0:
+                # Find the executable asset
+                download_url = None
+                for asset in latest_release['assets']:
+                    if asset['name'].endswith('.exe'):
+                        download_url = asset['browser_download_url']
+                        break
+                
+                if download_url:
+                    return {
+                        'update_available': True,
+                        'latest_version': latest_version,
+                        'current_version': current_version,
+                        'download_url': download_url,
+                        'changelog': latest_release.get('body', 'No changelog available'),
+                        'release_name': latest_release.get('name', f'Version {latest_version}')
+                    }
+        
+        return {'update_available': False, 'current_version': current_version}
+    
+    except requests.exceptions.RequestException:
+        return {'update_available': False, 'error': 'Connection failed'}
+    except Exception as e:
+        return {'update_available': False, 'error': str(e)}
+
+def show_update_prompt(update_info):
+    """Show update notification to user"""
+    print("\n" + "="*60)
+    print("🔔 UPDATE AVAILABLE!")
+    print("="*60)
+    print(f"📦 {update_info.get('release_name', 'New Version')}")
+    print(f"📊 Current version: v{update_info['current_version']}")
+    print(f"🆕 Latest version:  v{update_info['latest_version']}")
+    print()
+    
+    changelog = update_info.get('changelog', '').strip()
+    if changelog and changelog != 'No changelog available':
+        print("📋 What's new:")
+        print("-"*40)
+        # Limit changelog display to avoid overwhelming user
+        lines = changelog.split('\n')[:10]
+        for line in lines:
+            print(f"  {line}")
+        if len(changelog.split('\n')) > 10:
+            print("  ... (see full changelog on GitHub)")
+        print()
+    
+    while True:
+        choice = input("Would you like to update now? (y/n): ").lower().strip()
+        if choice in ['y', 'yes']:
+            return True
+        elif choice in ['n', 'no']:
+            return False
+        else:
+            print("Please enter 'y' for yes or 'n' for no.")
+
+def download_and_install_update(download_url, latest_version):
+    """Download and install the update"""
+    if not requests:
+        print("❌ Cannot download updates - requests module not available")
+        return False
+    
+    try:
+        print(f"\n🔄 Downloading BLAMITE Organizer v{latest_version}...")
+        print("This may take a moment depending on your internet connection...")
+        
+        # Download the new executable
+        response = requests.get(download_url, stream=True)
+        response.raise_for_status()
+        
+        total_size = int(response.headers.get('content-length', 0))
+        downloaded = 0
+        
+        # Create temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.exe') as temp_file:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    temp_file.write(chunk)
+                    downloaded += len(chunk)
+                    if total_size > 0:
+                        percent = (downloaded / total_size) * 100
+                        print(f"\r📥 Progress: {percent:.1f}% ({downloaded//1024}KB/{total_size//1024}KB)", end="")
+            temp_path = temp_file.name
+        
+        print("\n✅ Download complete!")
+        
+        # Get current executable path
+        if getattr(sys, 'frozen', False):
+            current_exe = Path(sys.executable)
+        else:
+            current_exe = Path(__file__).parent / "dist" / "BLAMITE_Organizer.exe"
+        
+        # Create backup of current version
+        backup_path = current_exe.parent / f"BLAMITE_Organizer_backup_{get_current_version()}.exe"
+        
+        # Create update script
+        update_script = f"""@echo off
+title BLAMITE Organizer Update
+echo.
+echo 🔄 Installing BLAMITE Organizer v{latest_version}...
+echo.
+
+REM Wait a moment for the main program to close
+timeout /t 2 /nobreak >nul
+
+REM Create backup
+echo 📦 Creating backup...
+if exist "{current_exe}" (
+    copy "{current_exe}" "{backup_path}" >nul 2>&1
+    if %ERRORLEVEL% EQU 0 (
+        echo ✅ Backup created successfully
+    ) else (
+        echo ⚠️  Could not create backup, continuing anyway...
+    )
+)
+
+REM Install update
+echo 🔄 Installing new version...
+move "{temp_path}" "{current_exe}" >nul 2>&1
+
+if %ERRORLEVEL% EQU 0 (
+    echo.
+    echo ✅ Update installed successfully!
+    echo 🚀 Starting BLAMITE Organizer v{latest_version}...
+    echo.
+    timeout /t 2 /nobreak >nul
+    start "" "{current_exe}"
+) else (
+    echo.
+    echo ❌ Update failed! Restoring backup...
+    if exist "{backup_path}" (
+        copy "{backup_path}" "{current_exe}" >nul 2>&1
+        echo ✅ Backup restored
+    )
+    echo.
+    echo Press any key to start the original version...
+    pause >nul
+    start "" "{current_exe}"
+)
+
+REM Clean up
+timeout /t 3 /nobreak >nul
+del "%~f0" >nul 2>&1
+"""
+        
+        # Write and execute update script
+        script_path = current_exe.parent / "update_blamite.bat"
+        with open(script_path, 'w') as f:
+            f.write(update_script)
+        
+        print("🔄 Preparing to install update...")
+        print("The program will restart automatically after the update.")
+        print("Please wait...")
+        
+        # Start update process
+        subprocess.Popen([str(script_path)], shell=True, cwd=str(current_exe.parent))
+        
+        # Close current instance
+        time.sleep(1)
+        sys.exit(0)
+        
+    except Exception as e:
+        print(f"\n❌ Update installation failed: {e}")
+        print("You can download the latest version manually from GitHub.")
+        input("Press Enter to continue with current version...")
+        return False
+
+def manual_update_check():
+    """Manual update check from settings menu"""
+    print("\n🔍 Checking for updates...")
+    update_info = check_for_updates()
+    
+    if 'error' in update_info:
+        print(f"❌ Update check failed: {update_info['error']}")
+    elif update_info.get('update_available', False):
+        if show_update_prompt(update_info):
+            download_and_install_update(update_info['download_url'], update_info['latest_version'])
+    else:
+        current_version = update_info.get('current_version', get_current_version())
+        print(f"✅ You're running the latest version (v{current_version})")
+    
+    input("\nPress Enter to continue...")
 
 def load_settings():
     """Load user settings from file"""
@@ -178,11 +420,12 @@ def show_settings_menu():
         print("5. Change backtrack days")
         print("6. Toggle ALL files mode")
         print("7. Toggle Windows startup")
-        print("8. Reset to defaults")
-        print("9. Return to main program")
+        print("8. Check for updates")
+        print("9. Reset to defaults")
+        print("10. Return to main program")
         print("="*50)
         
-        choice = input("\nEnter your choice (1-9): ").strip()
+        choice = input("\nEnter your choice (1-10): ").strip()
         
         if choice == '4':
             settings['backtrack_enabled'] = not settings['backtrack_enabled']
@@ -223,6 +466,9 @@ def show_settings_menu():
                 print(f"❌ {message}")
                 
         elif choice == '8':
+            manual_update_check()
+            
+        elif choice == '9':
             confirm = input("Reset all settings to defaults? (y/n): ")
             if confirm.lower() == 'y':
                 # Remove from startup if currently enabled
@@ -237,13 +483,13 @@ def show_settings_menu():
                 }
                 print("✅ Settings reset to defaults")
                 
-        elif choice == '9':
+        elif choice == '10':
             save_settings(settings)
             print("✅ Settings saved!")
             return settings
             
         else:
-            print("❌ Invalid choice. Please enter 1-9")
+            print("❌ Invalid choice. Please enter 1-10")
 
 # Create organizer folders if they don't exist
 def setup_folders():
@@ -508,6 +754,16 @@ class FileHandler(FileSystemEventHandler):
 def main():
     # Load user settings
     settings = load_settings()
+    
+    # Check for updates on startup (optional background check)
+    try:
+        update_info = check_for_updates()
+        if update_info.get('update_available', False):
+            print("\n🔔 A new version is available!")
+            print(f"Current: v{update_info['current_version']} → Latest: v{update_info['latest_version']}")
+            print("💡 Go to Settings (press 'S') to update or continue normally.")
+    except:
+        pass  # Don't let update checks interrupt startup
     
     # Show welcome message and settings option
     print("\n" + "="*50)

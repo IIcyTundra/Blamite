@@ -33,8 +33,20 @@ def main():
             shutil.rmtree(folder)
             print(f"✓ Removed {folder} folder")
     
+    # Check if required files exist
+    required_files = ["main.py", "BLAMITE_TITLE.txt", "VERSION"]
+    missing_files = []
+    for file in required_files:
+        if not Path(file).exists():
+            missing_files.append(file)
+    
+    if missing_files:
+        print(f"\n❌ Missing required files: {', '.join(missing_files)}")
+        print("Please ensure all required files are present before building.")
+        return False
+    
     # Install required packages
-    packages = ["pyinstaller", "watchdog", "pywin32"]
+    packages = ["pyinstaller", "watchdog", "pywin32", "requests"]
     for package in packages:
         if not run_command(f"pip install {package}", f"Installing {package}"):
             print(f"Failed to install {package}. Please install manually.")
@@ -47,6 +59,8 @@ def main():
         "--console",           # Keep console window
         "--icon=BLAMITE_Logo.ico",  # Use our custom icon
         "--name=BLAMITE_Organizer", # Executable name
+        "--add-data=BLAMITE_TITLE.txt;.",  # Include title file
+        "--add-data=VERSION;.",     # Include version file
         "main.py"              # Source file
     ]
     

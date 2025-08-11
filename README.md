@@ -24,10 +24,12 @@ BLAMITE Organizer is a Python-based file organization tool that monitors your Do
 - **🗂️ Desktop Integration**: Creates organized folders directly on your Desktop for easy access
 - **⚙️ Customizable Settings**: Configure backtracking preferences and file organization behavior
 - **⏰ Flexible Backtracking**: Choose from 30-day backtracking, custom date ranges, or organize ALL files
-- **🔍 Duplicate Handling**: Automatically renames duplicate files to avoid conflicts
+- **� Windows Startup Integration**: Optionally run BLAMITE on Windows startup for seamless operation
+- **🔄 Auto-Update System**: Automatic update checking and one-click updates from GitHub releases
+- **�🔍 Duplicate Handling**: Automatically renames duplicate files to avoid conflicts
 - **📥 Download Detection**: Waits for files to finish downloading before organizing
-- **🚀 Executable Available**: Run as a standalone .exe file (no Python required)
-- **📝 Text File Support**: Now includes support for organizing .txt files
+- **🏃‍♂️ Executable Available**: Run as a standalone .exe file (no Python required)
+- **📝 Text File Support**: Full support for organizing .txt files along with other document types
 
 ## 📋 Supported File Types
 
@@ -308,6 +310,37 @@ backtrack_days=30
 # WARNING: Setting this to true will organize ALL files in Downloads!
 backtrack_all_files=false
 ```
+
+## 🔄 Auto-Update System
+
+BLAMITE Organizer features an integrated update system that keeps your application current:
+
+### Features
+- **🔍 Automatic Check**: Updates are checked on startup (non-intrusive)
+- **📱 Manual Check**: Use Settings menu (option 8) to check for updates anytime
+- **🔄 One-Click Updates**: Download and install updates automatically
+- **💾 Backup Creation**: Automatic backup of current version before updating
+- **🔁 Self-Restart**: Application restarts automatically after successful update
+- **🛡️ Safe Rollback**: Automatic restoration if update fails
+
+### How It Works
+1. **GitHub Integration**: Connects to GitHub releases API to check for new versions
+2. **Version Comparison**: Compares your current version with the latest available
+3. **Secure Download**: Downloads the new executable directly from GitHub releases
+4. **Smart Installation**: Creates backup, installs update, and verifies success
+5. **Automatic Restart**: Launches the new version and cleans up temporary files
+
+### Update Process
+When an update is available:
+1. You'll see a notification on startup or in the settings menu
+2. Choose to install the update or continue with current version
+3. If updating, the process is fully automated - just wait for restart
+4. Your settings and preferences are preserved across updates
+
+### Requirements
+- Internet connection for update checking and downloading
+- Windows with appropriate permissions for file operations
+- The update system requires the `requests` library (included in executable builds)
 
 ## ⚙️ Configuration
 
